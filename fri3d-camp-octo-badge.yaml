@@ -1,0 +1,127 @@
+esphome:
+  name: fri3d-camp-octo-badge
+
+esp32:
+  board: m5stack-core2 # not this specific board but this also has 4MB RAM and 16MB flash
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Esphome-Web-Octo"
+    password: "9oaOHmFnFCMWB4"
+
+captive_portal:
+
+# Fri3d Camp Octo Badge 2022 on-board peripherals below...
+
+i2c:
+  sda: 21
+  scl: 22
+  scan: true
+  id: bus_a
+
+# 5 adressable RGB LEDs
+light:
+  - platform: fastled_clockless
+    chipset: WS2812
+    pin: GPIO02
+    num_leds: 5
+    rgb_order: GRB
+    name: "Octo WS2812 Light"
+
+# Buzzer/Speaker
+output:
+  - platform: ledc
+    pin: GPIO32
+    id: rtttl_out
+rtttl:
+  output: rtttl_out
+
+sensor:
+# Li-Ion Battery Voltage
+  - platform: adc
+    pin: GPIO35
+    name: "Octo Battery Voltage"
+    update_interval: 5s
+    unit_of_measurement: "V"
+    icon: "mdi:battery"
+    attenuation: 11dB
+    filters:
+      - multiply: 2 # battery voltage is divided by 2 by R12 and R17
+      - sliding_window_moving_average:
+          window_size: 3
+          send_every: 3
+# LIS2DH12 accelerometer is not yet supported by ESPHome 2022.8.0
+#  - platform: ???????
+#    address: 0x18
+
+binary_sensor:
+# Boot button (SW3)
+  - platform: gpio
+    pin:
+      number: GPIO0
+      inverted: true
+    name: "Octo Boot button"
+    on_press:
+      then:
+        if:
+          condition:
+            rtttl.is_playing
+          then:
+            - rtttl.stop
+          else:
+            - rtttl.play: 'MissionImp:d=16,o=6,b=95:32d,32d#,32d,32d#,32d,32d#,32d,32d#,32d,32d,32d#,32e,32f,32f#,32g,g,8p,g,8p,a#,p,c7,p,g,8p,g,8p,f,p,f#,p,g,8p,g,8p,a#,p,c7,p,g,8p,g,8p,f,p,f#,p,a#,g,2d,32p,a#,g,2c#,32p,a#,g,2c,a#5,8c,2p,32p,a#5,g5,2f#,32p,a#5,g5,2f,32p,a#5,g5,2e,d#,8d'
+# LIS2DH12 accelerometer interrupt
+  - platform: gpio
+    pin:
+      number: GPIO36
+      #inverted: true
+    name: "Octo Accelerometer Interrupt"
+
+# Badge link
+# GPIO4
+
+# ST7789V 240x240 IPS LCD
+# Should be supported by ESPHome 2022.8.0 released 2022-08-17, but not yet working
+spi:
+  clk_pin: GPIO18
+  mosi_pin: GPIO19
+font:
+  - file: "FreeSans.ttf"
+    id: freesans
+    size: 48
+display:
+  - platform: st7789v
+    #model: "ADAFRUIT_FUNHOUSE_240X240"
+    model: custom
+    height: 240
+    width: 240
+    offset_height: 100
+    offset_width: 100
+    #backlight_pin: GPIO4
+    cs_pin: GPIO5
+    dc_pin: GPIO33
+    reset_pin: GPIO14 # unused IO. RST of LDC is tied to ESP RST on the Octo board
+    lambda: |-
+      it.print(0, 0, id(freesans), "Hello World!");
+
+# Infrared Receiver
+remote_receiver:
+  pin:
+    number: GPIO25
+    inverted: true
+    mode: INPUT_PULLUP
+  dump: raw # use "jvc" for blaster?
